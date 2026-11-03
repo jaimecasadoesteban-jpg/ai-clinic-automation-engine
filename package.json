@@ -1,0 +1,49 @@
+{
+  "name": "ai-clinic-automation-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:aislamiento": "vitest run tests/aislamiento",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:test:up": "docker compose up -d --wait",
+    "db:test:down": "docker compose down -v",
+    "eval": "tsx scripts/eval.ts",
+    "cliente:alta": "tsx scripts/alta-cliente.ts",
+    "db:migrate:local": "DIRECT_URL=postgres://postgres@127.0.0.1:5544/motor_test drizzle-kit migrate",
+    "agenda:falsa": "tsx scripts/agenda-falsa.ts",
+    "chat": "tsx scripts/chat.ts",
+    "tanda": "tsx scripts/tanda.ts",
+    "panel:local": "tsx --env-file=.env scripts/panel-local.ts",
+    "demo": "tsx scripts/demo.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.6.1",
+    "fastify-type-provider-zod": "^7.0.0",
+    "nodemailer": "10.0.14",
+    "postgres": "^3.4.7",
+    "yaml": "^2.9.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "drizzle-kit": "^0.31.6",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "license": "UNLICENSED",
+  "description": "Multi-tenant conversational appointment engine for clinics: deterministic safety layers around an LLM."
+}

@@ -1,0 +1,59 @@
+# Lo que no debe salir del repositorio ni entrar en la imagen.
+#
+# Se escribe en negativo —excluir— y no en positivo, porque el fallo caro aquí es
+# el olvido: un fichero nuevo con secretos que nadie añadió a una lista blanca
+# viajaría a la imagen sin que salte nada.
+
+# --- Secretos. Lo primero y lo que más importa -------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.netrc
+
+# --- Nunca se copia: la imagen instala las suyas ------------------------------
+node_modules
+dist
+.npm
+
+# --- Historial y metadatos del repositorio ------------------------------------
+.git
+.gitignore
+.github
+.gitattributes
+
+# --- Pruebas y herramientas de desarrollo -------------------------------------
+tests
+scripts
+vitest.config.ts
+docker-compose.yml
+drizzle.config.ts
+coverage
+.vitest
+
+# --- Documentación: no la necesita el proceso ---------------------------------
+docs
+README.md
+docs
+legacy
+*.md
+!package.json
+
+# --- Basura de editores y sistemas operativos ---------------------------------
+.vscode
+.idea
+.DS_Store
+*.swp
+*.log
+npm-debug.log*
+
+# --- Cachés de agentes y herramientas que hayan pasado por aquí ---------------
+.claude
+.cache
+.antigravity
+.codeium
+.devin

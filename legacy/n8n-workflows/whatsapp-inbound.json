@@ -1,0 +1,302 @@
+{
+  "name": "WhatsApp inbound (retired)",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $('Extraer mensaje1').item.json.telefono, type: 'text', text: { preview_url: false, body: $json.respuesta } }) }}",
+        "options": {}
+      },
+      "name": "Responder al paciente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1056,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aplana el array de efectos en una lista de envios.\n//\n// No hace falta un Switch por tipo: el nucleo ya ha resuelto A QUIEN va\n// cada efecto (destinatarios, desde escalado del YAML) y CON QUE TEXTO\n// (compuesto desde avisos del YAML). n8n solo manda texto a destino.\n// Si enrutaramos aqui tambien, tendriamos dos criterios que acabarian\n// desincronizados.\n//\n// El ORDEN del array importa y se conserva: al reagendar sale primero\n// la anulacion y luego el aviso de la cita nueva. Al reves, recepcion\n// lee \"mete esta\" y despues \"lo anterior no vale\", y mete la que no era.\n\nconst salida = [];\nconst respuesta = $input.first().json;\nconst efectos = respuesta.efectos ?? [];\n\nfor (const efecto of efectos) {\n  const destinatarios = efecto.destinatarios ?? [];\n\n  // avisar_a_recepcion_de_anulacion trae el texto util en\n  // mensajeParaRecepcion de la respuesta, no en el propio efecto.\n  const texto = efecto.texto ?? respuesta.mensajeParaRecepcion ?? null;\n\n  // Los efectos que no van a una persona (registrar_baja y demas)\n  // no tienen destinatarios: se ignoran aqui a proposito.\n  if (!texto || destinatarios.length === 0) continue;\n\n  for (const destinatario of destinatarios) {\n    if (destinatario.canal !== 'whatsapp') continue;\n\n    salida.push({\n      json: {\n        tipo: efecto.tipo,\n        destino: destinatario.destino,\n        paraQuien: destinatario.nombre,\n        texto\n      }\n    });\n  }\n}\n\nreturn salida;"
+      },
+      "name": "Preparar avisos a la clinica",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $json.destino, type: 'text', text: { preview_url: false, body: $json.texto } }) }}",
+        "options": {}
+      },
+      "name": "Avisar a la clinica",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1056,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Meta verifica webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.verify_token'] === $env.WHATSAPP_VERIFY_TOKEN ? $json.query['hub.challenge'] : 'token invalido' }}",
+        "options": {}
+      },
+      "name": "Devolver challenge1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        144,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "options": {}
+      },
+      "name": "Mensaje de WhatsApp1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta manda muchos webhooks que NO son mensajes: acuses de entrega,\n// lecturas y cambios de estado. Sin filtrar, el nucleo recibiria basura\n// y devolveria 400. Devolver cero items para el workflow por si solo.\n//\n// PENDIENTE: los audios se descartan aqui en silencio. En estetica la\n// gente manda notas de voz a diario, y hoy el paciente no recibe nada\n// y cree que ha llegado.\n\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cuerpo = item.json.body ?? item.json;\n\n  for (const entrada of cuerpo.entry ?? []) {\n    for (const cambio of entrada.changes ?? []) {\n      const valor = cambio.value ?? {};\n      const contactos = valor.contacts ?? [];\n\n      for (const mensaje of valor.messages ?? []) {\n        if (mensaje.type !== 'text') continue;\n\n        const contacto = contactos.find((c) => c.wa_id === mensaje.from);\n        const nombrePerfil = (contacto?.profile?.name ?? '').trim();\n\n        salida.push({\n          json: {\n            idMensaje: mensaje.id,\n            telefono: '+' + mensaje.from,\n            nombre: (nombrePerfil || 'Paciente').slice(0, 100),\n            texto: (mensaje.text?.body ?? '').slice(0, 4000),\n            phoneNumberId: valor.metadata?.phone_number_id ?? null\n          }\n        });\n      }\n    }\n  }\n}\n\nreturn salida;"
+      },
+      "name": "Extraer mensaje1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://appointment-core:3000/cliente-por-remitente/{{ encodeURIComponent($json.phoneNumberId) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Resolver clinica1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        352,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://appointment-core:3000/mensaje-entrante",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.NUCLEO_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ idempotencyKey: $('Extraer mensaje1').item.json.idMensaje, clientId: $json.clientId, telefono: $('Extraer mensaje1').item.json.telefono, nombre: $('Extraer mensaje1').item.json.nombre, texto: $('Extraer mensaje1').item.json.texto, proveedorMensajeId: $('Extraer mensaje1').item.json.idMensaje }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "name": "Llamar al nucleo1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        576,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "hay-respuesta",
+              "leftValue": "={{ $json.respuesta }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Hay algo que enviar1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        256
+      ]
+    }
+  ],
+  "connections": {
+    "Preparar avisos a la clinica": {
+      "main": [
+        [
+          {
+            "node": "Avisar a la clinica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta verifica webhook1": {
+      "main": [
+        [
+          {
+            "node": "Devolver challenge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje de WhatsApp1": {
+      "main": [
+        [
+          {
+            "node": "Extraer mensaje1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer mensaje1": {
+      "main": [
+        [
+          {
+            "node": "Resolver clinica1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver clinica1": {
+      "main": [
+        [
+          {
+            "node": "Llamar al nucleo1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Llamar al nucleo1": {
+      "main": [
+        [
+          {
+            "node": "Hay algo que enviar1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Preparar avisos a la clinica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay algo que enviar1": {
+      "main": [
+        [
+          {
+            "node": "Responder al paciente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

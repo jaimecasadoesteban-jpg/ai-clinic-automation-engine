@@ -1,0 +1,11 @@
+-- Modo de confirmación automática.
+--
+-- Un solo motivo de escalado nuevo: n8n no pudo dejar el evento en la agenda de
+-- la clínica, o no llegó a contestar. **No sabemos si el evento existe**, y esa
+-- es exactamente la diferencia con una colisión: aquí no se toca la cita del
+-- paciente y una persona comprueba si está o no está.
+--
+-- `ADD VALUE IF NOT EXISTS` dentro de la migración, como en 0007: en PostgreSQL
+-- 12 y posteriores se puede dentro de una transacción mientras el valor nuevo no
+-- se USE en esa misma transacción, y aquí sólo se declara.
+ALTER TYPE "motor"."escalation_reason" ADD VALUE IF NOT EXISTS 'agenda_no_escrita';

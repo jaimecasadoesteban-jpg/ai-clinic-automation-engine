@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets and local artifacts
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/

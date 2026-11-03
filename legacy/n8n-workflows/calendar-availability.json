@@ -1,0 +1,272 @@
+{
+  "name": "Calendar availability (retired)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agenda/ocupacion",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "name": "Peticion de ocupacion",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// La autenticación la hace el propio nodo webhook.\n// El calendario lo manda el núcleo desde el YAML (agenda.calendarioId).\n// Antes había aquí un mapa clientId -> calendario escrito a mano.\n\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cuerpo = item.json.body ?? {};\n\n  const calendarId = cuerpo.calendarioId;\n  if (!calendarId) {\n    throw new Error('La petición no trae calendarioId: ¿núcleo sin desplegar?');\n  }\n\n  salida.push({\n    json: {\n      timeMin: cuerpo.desde,\n      timeMax: cuerpo.hasta,\n      calendarId\n    }\n  });\n}\n\nreturn salida;"
+      },
+      "name": "Comprobar y preparar ocupacion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/freeBusy",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timeMin: $json.timeMin, timeMax: $json.timeMax, items: [{ id: $json.calendarId }] }) }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "name": "freeBusy ocupacion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "googleCalendarOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convierte la respuesta de freeBusy al esquema que espera el nucleo.\n// NO se filtra nada: ni horario, ni dias de cierre, ni antelacion, ni\n// duracion. Eso lo aplica el nucleo, que tiene el YAML y los tests.\n// Si la clinica cierra los domingos, mandamos igualmente lo ocupado\n// un domingo.\n\nconst respuesta = $input.first().json;\nconst calendarId = $('Comprobar y preparar ocupacion').first().json.calendarId;\n\nconst calendario = respuesta.calendars?.[calendarId];\n\n// Si el calendario no existe o no esta compartido, Google NO falla:\n// devuelve errors y busy vacio. Sin esta comprobacion diriamos\n// \"no hay nada ocupado\" y el agente propondria citas encima de una\n// agenda llena. Es el fallo silencioso mas caro de esta integracion.\nif (calendario?.errors) {\n  throw new Error('Google devolvio errores para el calendario: ' + JSON.stringify(calendario.errors));\n}\n\nif (!calendario) {\n  throw new Error('Google no devolvio el calendario ' + calendarId);\n}\n\n// toISOString() garantiza el formato con Z. El nucleo rechaza\n// desplazamientos tipo +02:00.\nconst ocupado = (calendario.busy ?? []).map((bloque) => ({\n  inicio: new Date(bloque.start).toISOString(),\n  fin: new Date(bloque.end).toISOString()\n}));\n\nreturn [{ json: { ocupado } }];"
+      },
+      "name": "Formatear ocupacion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Responder ocupacion",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agenda/hueco-libre",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "name": "Peticion de hueco libre",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        352
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// La autenticación la hace el propio nodo webhook.\n// El calendario lo manda el núcleo desde el YAML (agenda.calendarioId).\n// Antes había aquí un mapa clientId -> calendario escrito a mano.\n\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cuerpo = item.json.body ?? {};\n\n  const calendarId = cuerpo.calendarioId;\n  if (!calendarId) {\n    throw new Error('La petición no trae calendarioId: ¿núcleo sin desplegar?');\n  }\n\n  salida.push({\n    json: {\n      timeMin: cuerpo.inicio,\n      timeMax: cuerpo.fin,\n      inicio: cuerpo.inicio,\n      fin: cuerpo.fin,\n      calendarId\n    }\n  });\n}\n\nreturn salida;"
+      },
+      "name": "Comprobar y preparar hueco",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/freeBusy",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timeMin: $json.timeMin, timeMax: $json.timeMax, items: [{ id: $json.calendarId }] }) }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "name": "freeBusy hueco",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        352
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "googleCalendarOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Solape estricto, la misma semantica que el nucleo:\n//   inicio_a < fin_b && inicio_b < fin_a\n// Los intervalos que se TOCAN no solapan: 08:00-08:30 y 08:30-09:00\n// son compatibles. Con <= devolveriamos libre:false sobre huecos\n// perfectamente buenos y el paso 6 no confirmaria nunca.\n\nconst respuesta = $input.first().json;\nconst preparado = $('Comprobar y preparar hueco').first().json;\nconst calendario = respuesta.calendars?.[preparado.calendarId];\n\nif (calendario?.errors) {\n  throw new Error('Google devolvio errores para el calendario: ' + JSON.stringify(calendario.errors));\n}\n\nif (!calendario) {\n  throw new Error('Google no devolvio el calendario ' + preparado.calendarId);\n}\n\nconst inicioA = new Date(preparado.inicio).getTime();\nconst finA = new Date(preparado.fin).getTime();\n\nconst solapa = (calendario.busy ?? []).some((bloque) => {\n  const inicioB = new Date(bloque.start).getTime();\n  const finB = new Date(bloque.end).getTime();\n  return inicioA < finB && inicioB < finA;\n});\n\n// Booleano JSON de verdad, no la cadena \"true\".\nreturn [{ json: { libre: !solapa } }];"
+      },
+      "name": "Calcular hueco libre",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Responder hueco libre",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        352
+      ]
+    }
+  ],
+  "connections": {
+    "Peticion de ocupacion": {
+      "main": [
+        [
+          {
+            "node": "Comprobar y preparar ocupacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprobar y preparar ocupacion": {
+      "main": [
+        [
+          {
+            "node": "freeBusy ocupacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "freeBusy ocupacion": {
+      "main": [
+        [
+          {
+            "node": "Formatear ocupacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear ocupacion": {
+      "main": [
+        [
+          {
+            "node": "Responder ocupacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Peticion de hueco libre": {
+      "main": [
+        [
+          {
+            "node": "Comprobar y preparar hueco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprobar y preparar hueco": {
+      "main": [
+        [
+          {
+            "node": "freeBusy hueco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "freeBusy hueco": {
+      "main": [
+        [
+          {
+            "node": "Calcular hueco libre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular hueco libre": {
+      "main": [
+        [
+          {
+            "node": "Responder hueco libre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

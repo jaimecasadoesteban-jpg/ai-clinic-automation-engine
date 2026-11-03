@@ -1,0 +1,369 @@
+# Plantilla de alta de una clínica. Copia este fichero, cámbiale el nombre al
+# slug de la clínica (`clinica-tal.yaml`) y rellena los datos reales.
+#
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │ LOS DATOS DE ESTE FICHERO SON INVENTADOS. NO PUEDEN LLEGAR A PRODUCCIÓN. │
+# └──────────────────────────────────────────────────────────────────────────┘
+# La dirección, el aparcamiento, las formas de pago, la política de cancelación,
+# la primera visita y la preparación de cada servicio no son de ninguna clínica.
+# Se le dicen al paciente TAL CUAL, sin modelo y sin validación: una dirección
+# inventada que llegue a un paciente es una dirección falsa con el nombre de la
+# clínica. Lo mismo vale para precios, horario y contactos.
+#
+# Los valores inventados llevan la etiqueta `!ejemplo`. Mientras quede una, el
+# núcleo avisa al arrancar —«la clínica tiene datos de EJEMPLO»— con la lista de
+# campos. Al poner el dato real, borra la etiqueta con él. La lista completa de
+# lo que hay que pedirle a la clínica está en docs/DESIGN_RULES.md, § Alta de una clínica.
+#
+# Regla 7: dar de alta un cliente es añadir un fichero como éste y nada más.
+# Si en algún momento hace falta tocar un `.ts` para dar de alta una clínica,
+# el diseño ha fallado.
+#
+# Todo lo que está antes de la línea de guiones es OBLIGATORIO: si falta, el
+# proceso no arranca. Lo de después tiene valor por defecto en código y sólo se
+# pone para cambiarlo.
+
+slug: ejemplo
+nombre: Clínica Demo Aurora
+
+# Obligatoria y sin valor por defecto a propósito: una clínica en Canarias con
+# la zona de la península tendría TODAS sus citas desplazadas una hora.
+zonaHoraria: Europe/Madrid
+
+canal:
+  tipo: whatsapp
+  # El identificador de la línea en Meta (Phone Number ID de WhatsApp Business).
+  #
+  # **Es el único campo por el que se resuelve la clínica.** n8n recibe de Meta el
+  # `phone_number_id` y llama a GET /cliente-por-remitente/<ese id>, que compara
+  # esta cadena tal cual. No hay número de teléfono en esta sección y no hace
+  # falta: el E.164 del paciente entra en cada mensaje, y el de la clínica no lo
+  # usa nadie porque el núcleo no envía nada.
+  #
+  # Va entrecomillado y no es opcional: sin comillas, YAML lo lee como número y el
+  # esquema lo rechaza —«expected string, received number»—, así que no carga
+  # ninguna clínica y el servicio no arranca. Comprobado, no supuesto.
+  remitenteId: '000000000000000'
+  # Si la línea está en Chatwoot (coexistencia): la cuenta y el inbox, que
+  # resuelven la clínica de lo que llega a /chatwoot. Salen de la URL del inbox
+  # en Chatwoot: app.chatwoot.com/app/accounts/<cuentaId>/settings/inboxes/<inboxId>.
+  # La etiqueta para el agente en esa conversación hasta que se quite; por
+  # defecto, agente-parado.
+  #
+  # soloTelefonos es para las pruebas en un número real: el agente sólo atiende a
+  # esos teléfonos y el resto de contactos sigue en Chatwoot sin agente. Al
+  # quitarlo, contesta a todo el que escriba.
+  chatwoot:
+    cuentaId: 1
+    inboxId: 1
+    etiquetaAgenteParado: agente-parado
+    soloTelefonos: ['+34600000001']
+
+# De aquí sale el «fin de jornada», que es el vencimiento real de
+# pendiente_recepcion. Si la clínica cierra a mediodía, pon dos tramos.
+horario:
+  - { dia: lunes, abre: '10:00', cierra: '20:30' }
+  - { dia: martes, abre: '10:00', cierra: '20:30' }
+  - { dia: miercoles, abre: '10:00', cierra: '20:30' }
+  - { dia: jueves, abre: '10:00', cierra: '21:00' }
+  - { dia: viernes, abre: '10:00', cierra: '21:00' }
+  - { dia: sabado, abre: '10:00', cierra: '14:00' }
+
+agenda:
+  # A: se excluyen las próximas 24 h de la disponibilidad, para que recepción
+  #    tenga margen de reaccionar. B: sin exclusión.
+  nivel: A
+  # El calendario de la clínica en Google. Lo lee la disponibilidad y, en modo
+  # automático, es donde se crean las citas. Lo comparte la clínica con la
+  # cuenta de Google de n8n.
+  calendarioId: demo-clinic@group.calendar.google.com
+
+  # Quién deja la cita metida en la agenda de la clínica.
+  #
+  #   recepcion  (por defecto): nadie escribe salvo una persona. El hueco espera
+  #              a que alguien pulse «ya la he metido en agenda».
+  #   automatica: el núcleo crea el evento en Google y el paciente recibe la
+  #              confirmación en el momento, también de madrugada.
+  #
+  # ⚠️ `automatica` SÓLO tiene sentido si la agenda con la que trabaja la clínica
+  # ES el calendario que leemos. Si recepción trabaja sobre otro programa, el
+  # evento que escribimos no lo ve nadie y la confirmación que lee el paciente es
+  # falsa. No es una preferencia de producto: es una comprobación que hay que
+  # hacer con la clínica antes de ponerlo.
+  #
+  # Exige GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN en el
+  # entorno: sin ellas el núcleo no arranca, porque nadie escribiría la cita y
+  # el paciente esperaría una confirmación que no llega.
+  #
+  # La demo pública usa `recepcion`: no necesita credenciales de Google.
+  confirmacion: recepcion
+
+  # Qué se escribe en el evento (sólo se usa en modo `automatica`).
+  # Marcadores: {servicio} {nombre} {apellidos} {nombreCompleto} {telefono} {ref}
+  #
+  # Por defecto lleva nombre completo y teléfono, y es lo correcto: el calendario
+  # es de la clínica, que es la responsable del tratamiento y ya tiene a ese
+  # paciente en su ficha. Un evento que dijera «Limpieza facial — pac_8371»
+  # dejaría a recepción sin saber a quién llamar si hay que mover la cita.
+  #
+  # Si la pantalla de recepción se ve desde la sala de espera, quita los datos:
+  #   tituloDelEvento: 'Cita — {ref}'
+  #   descripcionDelEvento: 'Paciente {ref}. Consultar ficha.'
+  tituloDelEvento: '{servicio} — {nombreCompleto}'
+  descripcionDelEvento: "{nombreCompleto} · {telefono}\nCita pedida por WhatsApp. Paciente {ref}."
+
+# El catálogo. La validación de salida compara LITERALMENTE contra estos
+# precios: una cifra en euros que no esté aquí bloquea el mensaje antes de
+# enviarlo. Incluye los bonos como líneas propias, con el precio del paquete.
+#
+# `alias` es opcional: cómo lo llaman los pacientes cuando no es como lo llama
+# el catálogo. Sin él, «¿tenéis higienes faciales?» no se reconocía como la
+# limpieza facial, y se le volvía a preguntar al paciente lo que ya había dicho.
+servicios:
+  - codigo: laser-axilas
+    nombre: Depilación láser axilas
+    precio: 35.00
+    duracionMinutos: 20
+    # Se dice TAL CUAL al paciente, sin modelo: roza lo clínico. Lo escribe y lo
+    # aprueba la clínica. Sin este campo se remite a recepción, nunca se inventa.
+    preparacion: !ejemplo >-
+      Ven con la zona rasurada el día anterior, sin cera ni pinzas en las cuatro
+      semanas previas, y evita el sol en la zona la semana antes.
+  - codigo: laser-ingles
+    nombre: Depilación láser ingles completas
+    precio: 45.00
+    duracionMinutos: 25
+    preparacion: !ejemplo >-
+      Ven con la zona rasurada el día anterior, sin cera ni pinzas en las cuatro
+      semanas previas, y evita el sol en la zona la semana antes.
+  - codigo: laser-piernas
+    nombre: Depilación láser piernas enteras
+    precio: 95.00
+    duracionMinutos: 50
+    preparacion: !ejemplo >-
+      Ven con las piernas rasuradas el día anterior, sin cera ni pinzas en las
+      cuatro semanas previas, y evita el sol en la zona la semana antes.
+  - codigo: laser-piernas-bono6
+    nombre: Bono 6 sesiones piernas enteras
+    precio: 475.00
+    duracionMinutos: 50
+    esBono: true
+    sesiones: 6
+  - codigo: limpieza-facial
+    nombre: Limpieza facial profunda
+    alias: [higiene facial, limpieza de cara, limpieza de cutis]
+    precio: 55.00
+    preparacion: !ejemplo Si puedes, ven sin maquillaje; no hace falta nada más.
+    duracionMinutos: 60
+  - codigo: peeling-medico
+    nombre: Peeling médico facial
+    precio: 90.00
+    duracionMinutos: 45
+  - codigo: radiofrecuencia
+    nombre: Radiofrecuencia corporal
+    alias: [tratamiento reafirmante, reafirmante corporal]
+    precio: 70.00
+    duracionMinutos: 45
+  - codigo: radiofrecuencia-bono5
+    nombre: Bono 5 sesiones radiofrecuencia
+    precio: 315.00
+    duracionMinutos: 45
+    esBono: true
+    sesiones: 5
+
+# Lo que un paciente pregunta de la clínica y no es el catálogo ni el horario.
+# Se contesta TAL CUAL, sin modelo. Todo opcional: lo que falte se responde
+# remitiendo a recepción, que es verdad. Rellenarlo es parte de la implantación.
+# Datos de ejemplo: no son de ninguna clínica real.
+informacion:
+  direccion: !ejemplo >-
+    Estamos en la calle Ejemplo 14, bajo, a dos minutos del metro. (Dirección
+    ficticia de la clínica de demostración.)
+  aparcamiento: !ejemplo >-
+    No tenemos aparcamiento propio; el más cercano es un parking público a tres
+    minutos andando.
+  formasDePago: !ejemplo >-
+    Puedes pagar en efectivo, con tarjeta o con Bizum, y los bonos también en
+    dos plazos.
+  cancelacion: !ejemplo >-
+    Puedes cancelar o cambiar tu cita sin coste avisando con 24 horas de
+    antelación.
+  primeraVisita: !ejemplo >-
+    La primera vez te hacemos una valoración breve antes de la sesión, sin coste
+    añadido.
+
+# Sin contactos de escalado habría rutas que mueren sin que las vea nadie.
+# `severidadMinima`: 1 llega todo, 3 sólo las urgencias clínicas.
+escalado:
+  # A quién le llegan los avisos de cita: «mete esto en la agenda».
+  #
+  # Obligatorio y aparte de `contactos` a propósito: son dos trabajos distintos,
+  # aunque en una clínica pequeña sean la misma persona. Sin esto, una cita se
+  # queda pendiente para siempre porque nadie se entera.
+  recepcion:
+    - { nombre: Recepción, canal: whatsapp, destino: '+34600000001' }
+
+  # ⚠️ EN PRUEBAS todo va al mismo móvil, que es el único al que Meta entrega
+  # mientras el número no esté verificado. En una clínica de verdad esto son
+  # personas distintas, y la severidad es lo que decide a quién se despierta:
+  # severidadMinima 3 = sólo urgencias clínicas; 1 = todo.
+  contactos:
+    - nombre: Recepción
+      canal: whatsapp
+      destino: '+34600000001'
+      severidadMinima: 1
+    - nombre: Dirección médica
+      canal: whatsapp
+      destino: '+34600000001'
+      severidadMinima: 3
+
+  # A quién van las solicitudes de derechos del RGPD. OBLIGATORIO y aparte:
+  # no es recepción. El contrato de encargo compromete el traslado en 48 h a
+  # quien la clínica designe para protección de datos, y darle un valor por
+  # defecto sería suponer en silencio quién responde de una obligación legal.
+  #
+  # ⚠️ EN PRUEBAS va al mismo móvil para poder verlo llegar. En producción esto
+  # NO es recepción y no puede serlo por descuido.
+  proteccionDeDatos:
+    - nombre: Responsable de protección de datos
+      canal: whatsapp
+      destino: '+34600000001'
+
+# --- A partir de aquí, todo opcional -------------------------------------------
+
+# Textos fijos. Si no los pones, salen los del código, que existen para que
+# ninguna plantilla ausente acabe en un silencio (regla 4).
+#
+# textos:
+#   reagendado: "Hecho, te cambio {servicio} al {nueva} y suelto el de {anterior}. Queda
+#     pendiente de que recepción lo confirme y te aviso en cuanto esté."
+#   reagendadoDiferido: "..."
+#
+# `{nueva}` y `{anterior}` se sustituyen por las horas reales. Si escribes el
+# tuyo, ponlas las dos: sin la nueva el paciente no sabe cuándo tiene la cita, y
+# sin la anterior no sabe si la vieja sigue en pie. Y reagendar NO puede
+# compartir texto con elegir por primera vez: el paciente las vive distintas.
+
+# Tono y estilo. `tono: cercano` a secas sigue valiendo y equivale a esto.
+#
+# El estilo importa más de lo que parece: con la forma corta, el agente escribía
+# como un formulario —listas con guiones, un emoji en cada mensaje, «¡Genial!»
+# encadenados— y eso es lo primero que nota un paciente. Una recepcionista
+# escribe una o dos frases seguidas y ya está.
+
+tono:
+  registro: cercano          # cercano | neutro | formal
+  frasesMaximas: 2           # por mensaje; enumerar huecos no cuenta
+  emojisMaximos: 1           # y no en todos los mensajes
+  permiteListas: false       # nada de guiones ni numeradas en un WhatsApp
+  muletillasProhibidas: [genial, perfecto, te comento, estupendo, fenomenal]
+
+# Vencimientos de la máquina de estados. Los de docs/DESIGN_RULES.md; descoméntalos sólo
+# para cambiarlos.
+# vencimientos:
+#   propuestaMinutos: 360          # la propuesta caduca a las 6 h
+#   retenidaMinutos: 30            # la retención, a los 30 min
+#   recordatorioRecepcionMinutos: 120
+#   escaladoRecepcionMinutos: 240
+#   ventanaDeRellenoHoras: 72      # por debajo de esto, un hueco liberado se rellena
+#   agendaMinutos: 3               # sólo en modo automatica: cuánto se espera a n8n
+#
+# `agendaMinutos` es el respaldo de «n8n no contestó nunca», no el reloj que nota
+# el paciente: ése lo pone el tiempo límite del nodo HTTP de n8n, que tiene la
+# obligación de avisar de su propio fallo. Mientras corre, el paciente está
+# esperando en silencio, así que corto.
+
+# Cuándo puede el sistema escribir por su cuenta. NO afecta a responder a un
+# paciente: eso es 24/7. Acota avisos de caducidad, oleadas y aviso a recepción.
+envios:
+  horaMinima: '09:30'
+  horaMaxima: '21:30'
+  loteDeVencimientos: 25
+  loteDeOleada: 40
+
+cortafuegos:
+  # Los patrones extra SÓLO AÑADEN al catálogo del código. No hay forma de
+  # quitar ni sustituir uno: el peor error de edición posible aquí es cortar
+  # de más. Útil para tratamientos propios que la clínica quiere que se deriven.
+  patronesAdicionales:
+    - id: peeling-profundo
+      categoria: contenido_clinico
+      patron: '\bpeeling\s+(profundo|medico)\b'
+    - id: hilos-tensores
+      categoria: contenido_clinico
+      patron: '\bhilos\s+tensores\b'
+
+# Textos de cara al paciente. Los que no pongas usan el respaldo del código,
+# para que nunca haya silencio. Éstos los aprueba la clínica.
+textos:
+  urgencia: >-
+    Por lo que nos cuentas necesitas que te vea alguien ahora mismo, y eso no lo
+    puedo resolver por aquí. Llámanos al 900 000 000 o, si es grave, al 112. Ya
+    hemos avisado al equipo.
+  clinico: >-
+    Esto tiene que valorarlo nuestro personal sanitario, no puedo responderlo por
+    WhatsApp. Le paso tu mensaje al equipo y te contestan lo antes posible.
+  menor: >-
+    Para tratamientos en menores de edad necesitamos hablar antes con su madre,
+    padre o tutor legal. Le paso el mensaje al equipo para que os llamen.
+  baja: >-
+    Hecho, no volverás a recibir mensajes nuestros. Si algún día quieres retomarlo,
+    escríbenos cuando quieras.
+  # {hueco} es la hora concreta, en zona de la clínica, y {servicio} el
+  # tratamiento. Los dos son obligatorios: sin ellos la configuración no carga,
+  # porque el paciente se quedaría sin saber qué se le ha reservado — y el día
+  # que el sistema se equivoque de tratamiento, es lo que le permite darse cuenta.
+  retenido: >-
+    Te reservo el hueco del {hueco} para {servicio} y te llega la confirmación en
+    cuanto recepción lo pase a la agenda.
+  # Fuera de horario NO se dice que la clínica está cerrada: convierte en un
+  # problema lo que es el funcionamiento normal.
+  retenidoDiferido: >-
+    Te reservo el hueco del {hueco} para {servicio}; te llega la confirmación en
+    cuanto recepción abra y lo pase a la agenda.
+  confirmada: >-
+    Confirmada tu cita de {servicio} del {hueco}, ahí te esperamos.
+  # Cuando el hueco se ocupa entre medias. Dice a qué hora se pasa: enterarte de
+  # que tu cita ha cambiado sin que te digan a cuándo es peor que no enterarte.
+  colisionConAlternativa: >-
+    Ese hueco se acaba de ocupar, así que te paso {servicio} al {hueco} y te llega
+    la confirmación en cuanto recepción lo pase a la agenda.
+  colisionSinAlternativa: >-
+    Ese hueco se acaba de ocupar y no me quedan alternativas guardadas, así que
+    te escribe alguien del equipo con horas nuevas.
+  # Los dos que se leen cuando algo ha fallado. Antes estaban escritos a mano en
+  # el código y una clínica no podía cambiarlos.
+  escalado: >-
+    Con esto prefiero no contestarte a medias, así que te escribe alguien del
+    equipo en un momento.
+  proveedorCaido: >-
+    Ahora mismo no te puedo contestar bien, así que te escribe alguien del equipo
+    enseguida.
+  enPausa: >-
+    Tu mensaje ya está en manos del equipo y te contestan en cuanto puedan. Si es
+    urgente, llámanos al 900 000 000 o al 112.
+
+# Recordatorios antes de la cita. Sin esta sección, no se mandan. Salen dentro
+# de la franja de contacto; a quien pidió la cita dentro del plazo no se le
+# recuerda (acaba de recibir su confirmación).
+recordatorios:
+  horasAntes: 24
+
+# Las plantillas de WhatsApp aprobadas por Meta, por uso. Pasadas 24 h desde el
+# último mensaje del paciente, WhatsApp sólo entrega plantillas: lo que el
+# sistema manda por su cuenta sale con la suya o no sale (y avisa al operador).
+# `variables` dice qué dato va en {{1}}, {{2}}… en ese orden. Posibles: nombre,
+# servicio, cuando, clinica, enlace_resena. Nombre e idioma, exactamente como en
+# el WhatsApp Manager; si no coinciden con una aprobada y sincronizada en
+# Chatwoot, no sale.
+plantillas:
+  recordatorio: { nombre: recordatorio_cita, idioma: es, variables: [nombre, servicio, cuando, clinica] }
+  resena: { nombre: resena_visita, idioma: es, variables: [nombre, clinica, enlace_resena] }
+  reactivacion: { nombre: reactivacion, idioma: es, variables: [nombre, clinica] }
+
+# La reactivación se segmenta SÓLO por antigüedad. Segmentar por tratamiento
+# sería tratar datos de salud con fin comercial.
+reactivacion:
+  mesesSinVisitaMinimo: 5
+  mesesSinVisitaMaximo: 18
+  destinatariosPorOleada: 40

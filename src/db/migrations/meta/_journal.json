@@ -1,0 +1,167 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785759912196,
+      "tag": "0000_esquema_inicial",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785759912484,
+      "tag": "0001_rls_roles_y_purga",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785926313652,
+      "tag": "0002_senales_de_escalado",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786244416184,
+      "tag": "0003_servicio_de_conversacion",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786655171516,
+      "tag": "0004_un_hueco_una_fila",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786760744380,
+      "tag": "0005_revocacion_de_baja",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786761486826,
+      "tag": "0006_derechos_rgpd",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786896773811,
+      "tag": "0007_vigilancia",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787276164271,
+      "tag": "0008_clinica_por_remitente",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787700000000,
+      "tag": "0009_confirmacion_automatica",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791500000000,
+      "tag": "0010_varias_citas",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791600000000,
+      "tag": "0011_borradores_bloqueados",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791700000000,
+      "tag": "0012_historial_desmentido",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791800000000,
+      "tag": "0013_registro_y_resumen",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792203000000,
+      "tag": "0014_agenda_no_disponible",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792290000000,
+      "tag": "0015_tabla_de_salida",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792380000000,
+      "tag": "0016_whatsapp_en_el_nucleo",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792470000000,
+      "tag": "0017_chatwoot",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792560000000,
+      "tag": "0018_evento_de_agenda",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792650000000,
+      "tag": "0019_planificador",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792740000000,
+      "tag": "0020_panel",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792830000000,
+      "tag": "0021_mensajes_del_equipo",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792920000000,
+      "tag": "0022_recordatorios",
+      "breakpoints": true
+    }
+  ]
+}
